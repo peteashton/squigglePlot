@@ -1,0 +1,37 @@
+#!/usr/bin/env python
+
+from __future__ import division, print_function
+
+import h5py
+import matplotlib.pyplot as plt
+import sys
+import argparse
+
+parser = argparse.ArgumentParser(description="Extract sequences from an indexed FASTA file by ID")
+parser.add_argument('files', metavar="file", type=str, nargs='*', 
+                            help="the name of FAST5 file to extract squiggle data from")
+parser.add_argument('--timebase', dest='timebase', action='store_true' )
+args = parser.parse_args()
+
+squiggle_figure = plt.figure(1)
+squiggle_axes = squiggle_figure.add_subplot(111)
+for filename in args.files:
+    f5file = h5py.File(filename, "r") 
+    root = f5file['Analyses']['EventDetection_000']['Reads']
+    read_key = root.keys()[0]
+    events = root[read_key]['Events']
+    xpoints = []
+    ypoints = []
+    for i in range(len(events['mean'])):
+        xpoints.append(events['start'][i])
+        if not args.timebase:
+            xpoints[-1] -= events['start'][0]
+        ypoints.append(events['mean'][i])
+        xpoints.append(events['start'][i] + events['length'][i])
+        if not args.timebase:
+            xpoints[-1] -= events['start'][0]
+        ypoints.append(events['mean'][i])
+    squiggle_axes.plot(xpoints, ypoints)
+
+plt.show()
+    
