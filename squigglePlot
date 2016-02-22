@@ -6,32 +6,53 @@ import h5py
 import matplotlib.pyplot as plt
 import sys
 import argparse
+import numpy as np
+
+# Set up argparse to get the arguments
 
 parser = argparse.ArgumentParser(description="Extract sequences from an indexed FASTA file by ID")
 parser.add_argument('files', metavar="file", type=str, nargs='*', 
                             help="the name of FAST5 file to extract squiggle data from")
-parser.add_argument('--timebase', dest='timebase', action='store_true' )
+parser.add_argument('--timebase', dest='timebase', action='store_true',
+                            help="If present, start each squiggle at its start time during the run")
 args = parser.parse_args()
+
+# Set up the figure and axes
 
 squiggle_figure = plt.figure(1)
 squiggle_axes = squiggle_figure.add_subplot(111)
+
+# Process each FAST5 file in the argument list
+
 for filename in args.files:
     f5file = h5py.File(filename, "r") 
     root = f5file['Analyses']['EventDetection_000']['Reads']
     read_key = root.keys()[0]
     events = root[read_key]['Events']
-    xpoints = []
-    ypoints = []
-    for i in range(len(events['mean'])):
-        xpoints.append(events['start'][i])
-        if not args.timebase:
-            xpoints[-1] -= events['start'][0]
-        ypoints.append(events['mean'][i])
-        xpoints.append(events['start'][i] + events['length'][i])
-        if not args.timebase:
-            xpoints[-1] -= events['start'][0]
-        ypoints.append(events['mean'][i])
-    squiggle_axes.plot(xpoints, ypoints)
+    num_events = len(events['mean'])
+    print("Processing %s with %d events" % (filename, num_events), file=sys.stderr)
+
+# Get the information from the flie so that we plot the current levels from the pore
+    
+    lengths = np.array(events['length'])
+    xstarts = np.array(events['start'])
+
+# We want to draw the plot as a step plot, rather that a line plot, so store the start and end time
+# for each dwell level, then intervleave them
+
+    xends = xstarts + lengths
+    xpoints = np.array([x for sublist in zip(xstarts, xends) for x in sublist])
+
+# Duplicate the y-coordinates, so there is one for the start and end of each dwell
+
+    ypoints = np.array([y for sublist in zip(events['mean'], events['mean']) for y in sublist])
+
+# If we don't want to show the absolute time of each squiggle, re-base all the x-coordinates to 0
+
+    if not args.timebase:
+        xpoints = xpoints - events['start'][0]
+    
+    squiggle_axes.plot(xpoints, ypoints, alpha=0.5)
 
 plt.show()
-    
+
